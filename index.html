@@ -1,249 +1,418 @@
 <!DOCTYPE html>
 <html>
 <head>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#111111">
 <meta charset="UTF-8">
+<meta name="theme-color" content="#111111">
 <title>Ultimate Tic Tac Toe</title>
 
 <style>
 :root{
-    --cyan:#00e5ff;
-    --orange:#ff8c00;
-    --bg:#0e0f13;
-    --panel:#171923;
-    --grid:#2b2f3a;
+ --cyan:#00e5ff;
+ --orange:#ff8c00;
+ --bg:#0e0f13;
+ --panel:#171923;
+ --grid:#2b2f3a;
 }
 
 body{
-    margin:0;
-    background:var(--bg);
-    color:#fff;
-    font-family:Segoe UI,Arial;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    padding:20px;
+ margin:0;
+ background:var(--bg);
+ color:#fff;
+ font-family:Segoe UI,Arial;
+ display:flex;
+ flex-direction:column;
+ align-items:center;
+ padding:20px;
 }
 
-h1{margin:10px 0 5px 0;}
-
-#status{
-    margin:10px;
-    font-size:20px;
-    letter-spacing:.5px;
-}
+#status{margin:10px;font-size:20px;}
 
 .big{
-    display:grid;
-    grid-template-columns:repeat(3,auto);
-    gap:14px;
-    padding:14px;
-    background:var(--panel);
-    border-radius:14px;
-    box-shadow:0 0 30px rgba(0,0,0,.5);
+ display:grid;
+ grid-template-columns:repeat(3,auto);
+ gap:14px;
+ padding:14px;
+ background:var(--panel);
+ border-radius:14px;
 }
 
 .small{
-    display:grid;
-    grid-template-columns:repeat(3,70px);
-    grid-template-rows:repeat(3,70px);
-    gap:2px;
-    background:var(--grid);
-    padding:6px;
-    border-radius:10px;
-    position:relative;
-    transition:.15s;
+ display:grid;
+ grid-template-columns:repeat(3,70px);
+ grid-template-rows:repeat(3,70px);
+ gap:2px;
+ background:var(--grid);
+ padding:6px;
+ border-radius:10px;
+ position:relative;
 }
 
-.small.playable.cyan{ outline:4px solid var(--cyan); box-shadow:0 0 18px var(--cyan); }
-.small.playable.orange{ outline:4px solid var(--orange); box-shadow:0 0 18px var(--orange); }
+.small.playable.cyan{outline:4px solid var(--cyan);box-shadow:0 0 18px var(--cyan);}
+.small.playable.orange{outline:4px solid var(--orange);box-shadow:0 0 18px var(--orange);}
 
 .cell{
-    width:70px;height:70px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:36px;
-    background:#0c0d12;
-    border-radius:6px;
-    cursor:pointer;
-    user-select:none;
-    transition:.12s;
+ width:70px;height:70px;
+ display:flex;align-items:center;justify-content:center;
+ font-size:36px;
+ background:#0c0d12;border-radius:6px;
+ cursor:pointer;
 }
 
-.cell:hover{background:#141722;}
+.cell.cyan{color:var(--cyan);}
+.cell.orange{color:var(--orange);}
 
-.cell.cyan{ color:var(--cyan); text-shadow:0 0 8px var(--cyan); }
-.cell.orange{ color:var(--orange); text-shadow:0 0 8px var(--orange); }
-
-.small.wonCyan{ background:rgba(0,229,255,.15); }
-.small.wonOrange{ background:rgba(255,140,0,.18); }
+.small.wonCyan{background:rgba(0,229,255,.15);}
+.small.wonOrange{background:rgba(255,140,0,.18);}
 
 .overlay{
-    position:absolute;
-    inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:90px;
-    font-weight:bold;
-    pointer-events:none;
-    opacity:.9;
+ position:absolute;inset:0;
+ display:flex;align-items:center;justify-content:center;
+ font-size:90px;font-weight:bold;
+ pointer-events:none;
 }
 
-.overlay.cyan{ color:var(--cyan); text-shadow:0 0 25px var(--cyan); }
-.overlay.orange{ color:var(--orange); text-shadow:0 0 25px var(--orange); }
+.menu{
+ position:fixed;
+ inset:0;
+ background:#0e0f13;
+ display:flex;
+ flex-direction:column;
+ align-items:center;
+ justify-content:center;
+ gap:20px;
+ z-index:10;
+}
 
-.turnCyan{color:var(--cyan);}
-.turnOrange{color:var(--orange);}
+button{
+ padding:12px 24px;
+ font-size:18px;
+ border-radius:10px;
+ border:none;
+ cursor:pointer;
+ background:#222;
+ color:#fff;
+}
+button:hover{background:#333;}
+.hidden{display:none;}
 </style>
 </head>
 
 <body>
 
+<div id="menu" class="menu">
 <h1>Ultimate Tic Tac Toe</h1>
+<button onclick="startGame('ai')">Play vs AI</button>
+<button onclick="startGame('friend')">Play vs Friend</button>
+</div>
+
+<div id="end" class="menu hidden">
+<h1 id="winnerText"></h1>
+<button onclick="startGame(currentMode)">Play Again</button>
+<button onclick="showMain()">Main Menu</button>
+</div>
+
 <div id="status"></div>
 <div id="board" class="big"></div>
 
 <script>
-const boardEl = document.getElementById("board");
-const statusEl = document.getElementById("status");
+const boardEl=document.getElementById("board");
+const statusEl=document.getElementById("status");
+const menuEl=document.getElementById("menu");
+const endEl=document.getElementById("end");
+const winnerText=document.getElementById("winnerText");
 
-let turn="C"; // C = cyan, O = orange
-let forcedBoard=null;
-let gameOver=false;
+let currentMode="ai";
 
+let turn,forcedBoard,gameOver;
 const smallBoards=[];
-const smallWinners=Array(9).fill(null);
+let smallWinners;
 
-function createBoard(){
-    for(let b=0;b<9;b++){
-        const small=document.createElement("div");
-        small.className="small";
-        small.dataset.index=b;
+const AI_PLAYER="O";   // Orange = AI
+const HUMAN_PLAYER="C";
 
-        const cells=[];
-        for(let c=0;c<9;c++){
-            const cell=document.createElement("div");
-            cell.className="cell";
-            cell.dataset.cell=c;
-            cell.addEventListener("click",()=>move(b,c));
-            small.appendChild(cell);
-            cells.push(cell);
-        }
+function startGame(mode){
+ currentMode=mode;
+ menuEl.classList.add("hidden");
+ endEl.classList.add("hidden");
 
-        boardEl.appendChild(small);
-        smallBoards.push({el:small,cells});
-    }
-    updatePlayable();
-    updateStatus();
+ boardEl.innerHTML="";
+ smallBoards.length=0;
+
+ turn=HUMAN_PLAYER;
+ forcedBoard=null;
+ gameOver=false;
+ smallWinners=Array(9).fill(null);
+
+ createBoard();
+ updatePlayable();
+ updateStatus();
 }
 
-function move(boardIndex,cellIndex){
-    if(gameOver) return;
+function showMain(){
+ endEl.classList.add("hidden");
+ menuEl.classList.remove("hidden");
+}
 
-    if(forcedBoard!==null && boardIndex!==forcedBoard){
-        if(isBoardFree(forcedBoard)) return;
-    }
+function createBoard(){
+ for(let b=0;b<9;b++){
+  const small=document.createElement("div");
+  small.className="small";
 
-    const board=smallBoards[boardIndex];
-    const cell=board.cells[cellIndex];
+  const cells=[];
+  for(let c=0;c<9;c++){
+   const cell=document.createElement("div");
+   cell.className="cell";
+   cell.addEventListener("click",()=>clickCell(b,c));
+   small.appendChild(cell);
+   cells.push(cell);
+  }
 
-    if(cell.textContent!=="" || smallWinners[boardIndex]) return;
+  boardEl.appendChild(small);
+  smallBoards.push({el:small,cells});
+ }
+}
 
-    if(turn==="C"){
-        cell.textContent="X";
-        cell.classList.add("cyan");
-    }else{
-        cell.textContent="O";
-        cell.classList.add("orange");
-    }
+function clickCell(b,c){
+ if(gameOver) return;
+ if(turn===AI_PLAYER && currentMode==="ai") return;
 
-    if(checkWin(board.cells,turn)){
-        smallWinners[boardIndex]=turn;
-        board.el.classList.add(turn==="C"?"wonCyan":"wonOrange");
+ move(b,c);
 
-        const overlay=document.createElement("div");
-        overlay.className="overlay "+(turn==="C"?"cyan":"orange");
-        overlay.textContent=turn==="C"?"X":"O";
-        board.el.appendChild(overlay);
-    }
+ if(!gameOver && currentMode==="ai" && turn===AI_PLAYER){
+     setTimeout(aiTurn,150);
+ }
+}
 
-    if(checkBigWin(turn)){
-        statusEl.innerHTML = `<span class="${turn==="C"?"turnCyan":"turnOrange"}">${turn==="C"?"Cyan":"Orange"} wins</span>`;
-        gameOver=true;
-        updatePlayable();
-        return;
-    }
+function move(b,c){
+ if(forcedBoard!==null && b!==forcedBoard && isBoardFree(forcedBoard)) return;
 
-    forcedBoard=cellIndex;
-    if(!isBoardFree(forcedBoard)) forcedBoard=null;
+ const board=smallBoards[b];
+ const cell=board.cells[c];
+ if(cell.textContent!=="" || smallWinners[b]) return;
 
-    turn = turn==="C"?"O":"C";
-    updatePlayable();
-    updateStatus();
+ const isC=turn===HUMAN_PLAYER;
+ cell.textContent=isC?"X":"O";
+ cell.classList.add(isC?"cyan":"orange");
+
+ if(checkWin(board.cells,turn)){
+  smallWinners[b]=turn;
+  board.el.classList.add(isC?"wonCyan":"wonOrange");
+
+  const o=document.createElement("div");
+  o.className="overlay "+(isC?"cyan":"orange");
+  o.textContent=isC?"X":"O";
+  board.el.appendChild(o);
+ }
+
+ if(checkBigWin(turn)){
+  endGame(turn);
+  return;
+ }
+
+ forcedBoard=c;
+ if(!isBoardFree(forcedBoard)) forcedBoard=null;
+
+ turn=turn===HUMAN_PLAYER?AI_PLAYER:HUMAN_PLAYER;
+ updatePlayable();
+ updateStatus();
+}
+
+function endGame(winner){
+ gameOver=true;
+ winnerText.innerHTML = winner===HUMAN_PLAYER ? "Cyan wins" : "Orange wins";
+ endEl.classList.remove("hidden");
 }
 
 function isBoardFree(i){
-    if(i===null) return true;
-    if(smallWinners[i]) return false;
-    return smallBoards[i].cells.some(c=>c.textContent==="");
+ if(i===null) return true;
+ if(smallWinners[i]) return false;
+ return smallBoards[i].cells.some(c=>c.textContent==="");
 }
 
 function updatePlayable(){
-    smallBoards.forEach((b,i)=>{
-        b.el.classList.remove("playable","cyan","orange");
-        if(gameOver) return;
+ smallBoards.forEach((b,i)=>{
+  b.el.classList.remove("playable","cyan","orange");
+  if(gameOver) return;
 
-        if(forcedBoard===null){
-            if(!smallWinners[i] && isBoardFree(i)){
-                b.el.classList.add("playable");
-                b.el.classList.add(turn==="C"?"cyan":"orange");
-            }
-        }else{
-            if(i===forcedBoard && !smallWinners[i]){
-                b.el.classList.add("playable");
-                b.el.classList.add(turn==="C"?"cyan":"orange");
-            }
-        }
-    });
+  if(forcedBoard===null){
+   if(!smallWinners[i] && isBoardFree(i)){
+    b.el.classList.add("playable");
+    b.el.classList.add(turn===HUMAN_PLAYER?"cyan":"orange");
+   }
+  }else{
+   if(i===forcedBoard && !smallWinners[i]){
+    b.el.classList.add("playable");
+    b.el.classList.add(turn===HUMAN_PLAYER?"cyan":"orange");
+   }
+  }
+ });
 }
 
 function updateStatus(){
+ if(gameOver) return;
+ const p=turn===HUMAN_PLAYER?"Cyan":"Orange";
+ statusEl.innerHTML=p+" turn";
+}
+
+function checkWin(cells,p){
+ const s=p===HUMAN_PLAYER?"X":"O";
+ const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+ return w.some(l=>l.every(i=>cells[i].textContent===s));
+}
+
+function checkBigWin(p){
+ const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+ return w.some(l=>l.every(i=>smallWinners[i]===p));
+}
+
+// ================= ADVANCED AI =================
+function aiTurn(){
     if(gameOver) return;
 
-    const player = turn==="C"
-        ? `<span class="turnCyan">Cyan</span>`
-        : `<span class="turnOrange">Orange</span>`;
+    const state = exportState();
+    const best = minimaxRoot(state,3); // depth can be increased
+    if(best) move(best.board,best.cell);
+}
 
-    if(forcedBoard===null){
-        statusEl.innerHTML = `${player} turn — play anywhere`;
-    }else{
-        statusEl.innerHTML = `${player} turn — board ${forcedBoard+1}`;
+// EXPORT STATE
+function exportState(){
+    const boards=[];
+    for(let b=0;b<9;b++){
+        const cells=smallBoards[b].cells.map(c=>{
+            if(c.textContent==="X") return HUMAN_PLAYER;
+            if(c.textContent==="O") return AI_PLAYER;
+            return null;
+        });
+        boards.push(cells);
     }
+    return {
+        boards,
+        smallWinners:[...smallWinners],
+        forcedBoard,
+        turn
+    };
 }
 
-function checkWin(cells,player){
-    const symbol = player==="C"?"X":"O";
-    const w=[
-        [0,1,2],[3,4,5],[6,7,8],
-        [0,3,6],[1,4,7],[2,5,8],
-        [0,4,8],[2,4,6]
-    ];
-    return w.some(line=>line.every(i=>cells[i].textContent===symbol));
+// GET LEGAL MOVES
+function getMoves(state){
+ const moves=[];
+ const boardsToCheck = state.forcedBoard!==null && isBoardPlayableState(state,state.forcedBoard)
+        ? [state.forcedBoard]
+        : [...Array(9).keys()];
+
+ for(const b of boardsToCheck){
+     if(state.smallWinners[b]) continue;
+     for(let c=0;c<9;c++){
+         if(state.boards[b][c]===null) moves.push({board:b,cell:c});
+     }
+ }
+ return moves;
 }
 
-function checkBigWin(player){
-    const w=[
-        [0,1,2],[3,4,5],[6,7,8],
-        [0,3,6],[1,4,7],[2,5,8],
-        [0,4,8],[2,4,6]
-    ];
-    return w.some(line=>line.every(i=>smallWinners[i]===player));
+function isBoardPlayableState(state,i){
+ if(state.smallWinners[i]) return false;
+ return state.boards[i].some(v=>v===null);
 }
 
-createBoard();
+// APPLY MOVE
+function applyMove(state,move){
+ const s=JSON.parse(JSON.stringify(state));
+ s.boards[move.board][move.cell]=s.turn;
+
+ if(checkWinArr(s.boards[move.board],s.turn)){
+     s.smallWinners[move.board]=s.turn;
+ }
+
+ s.forcedBoard=move.cell;
+ if(!isBoardPlayableState(s,s.forcedBoard)) s.forcedBoard=null;
+
+ s.turn=s.turn===HUMAN_PLAYER?AI_PLAYER:HUMAN_PLAYER;
+ return s;
+}
+
+// MINIMAX
+function minimaxRoot(state,depth){
+ let bestScore=-Infinity;
+ let bestMove=null;
+ for(const m of getMoves(state)){
+     const score=minimax(applyMove(state,m),depth-1,-Infinity,Infinity,false);
+     if(score>bestScore){ bestScore=score; bestMove=m; }
+ }
+ return bestMove;
+}
+
+function minimax(state,depth,alpha,beta,maximizing){
+ const winner=checkBigWinnerState(state);
+ if(winner===AI_PLAYER) return 10000;
+ if(winner===HUMAN_PLAYER) return -10000;
+ if(depth===0) return evaluate(state);
+
+ const moves=getMoves(state);
+ if(maximizing){
+     let max=-Infinity;
+     for(const m of moves){
+         const val=minimax(applyMove(state,m),depth-1,alpha,beta,false);
+         max=Math.max(max,val);
+         alpha=Math.max(alpha,val);
+         if(beta<=alpha) break;
+     }
+     return max;
+ }else{
+     let min=Infinity;
+     for(const m of moves){
+         const val=minimax(applyMove(state,m),depth-1,alpha,beta,true);
+         min=Math.min(min,val);
+         beta=Math.min(beta,val);
+         if(beta<=alpha) break;
+     }
+     return min;
+ }
+}
+
+// HEURISTIC
+function evaluate(state){
+ let score=0;
+ score+=evaluateLines(state.smallWinners,AI_PLAYER)*500;
+ score-=evaluateLines(state.smallWinners,HUMAN_PLAYER)*500;
+
+ for(let b=0;b<9;b++){
+     if(state.smallWinners[b]===AI_PLAYER) score+=200;
+     if(state.smallWinners[b]===HUMAN_PLAYER) score-=200;
+
+     score+=evaluateLines(state.boards[b],AI_PLAYER);
+     score-=evaluateLines(state.boards[b],HUMAN_PLAYER);
+ }
+ return score;
+}
+
+function evaluateLines(arr,player){
+ let s=0;
+ const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+ for(const l of lines){
+     const vals=l.map(i=>arr[i]);
+     const count=vals.filter(v=>v===player).length;
+     const empty=vals.filter(v=>v===null).length;
+     if(count===2 && empty===1) s+=10;
+     if(count===1 && empty===2) s+=2;
+ }
+ return s;
+}
+
+// WIN CHECK
+function checkWinArr(arr,player){
+ const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+ return w.some(line=>line.every(i=>arr[i]===player));
+}
+
+function checkBigWinnerState(state){
+ const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+ for(const line of w){
+     const vals=line.map(i=>state.smallWinners[i]);
+     if(vals.every(v=>v===AI_PLAYER)) return AI_PLAYER;
+     if(vals.every(v=>v===HUMAN_PLAYER)) return HUMAN_PLAYER;
+ }
+ return null;
+}
 </script>
 
 </body>
