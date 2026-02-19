@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
+<meta charset="UTF-8">
+<title>Ultimate Tic Tac Toe</title>
+
+<style>
+:root{
+    --cyan:#00e5ff;
+    --orange:#ff8c00;
+    --bg:#0e0f13;
+    --panel:#171923;
+    --grid:#2b2f3a;
+}
+
+body{
+    margin:0;
+    background:var(--bg);
+    color:#fff;
+    font-family:Segoe UI,Arial;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+}
+
+h1{margin:10px 0 5px 0;}
+
+#status{
+    margin:10px;
+    font-size:20px;
+    letter-spacing:.5px;
+}
+
+.big{
+    display:grid;
+    grid-template-columns:repeat(3,auto);
+    gap:14px;
+    padding:14px;
+    background:var(--panel);
+    border-radius:14px;
+    box-shadow:0 0 30px rgba(0,0,0,.5);
+}
+
+.small{
+    display:grid;
+    grid-template-columns:repeat(3,70px);
+    grid-template-rows:repeat(3,70px);
+    gap:2px;
+    background:var(--grid);
+    padding:6px;
+    border-radius:10px;
+    position:relative;
+    transition:.15s;
+}
+
+.small.playable.cyan{ outline:4px solid var(--cyan); box-shadow:0 0 18px var(--cyan); }
+.small.playable.orange{ outline:4px solid var(--orange); box-shadow:0 0 18px var(--orange); }
+
+.cell{
+    width:70px;height:70px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:36px;
+    background:#0c0d12;
+    border-radius:6px;
+    cursor:pointer;
+    user-select:none;
+    transition:.12s;
+}
+
+.cell:hover{background:#141722;}
+
+.cell.cyan{ color:var(--cyan); text-shadow:0 0 8px var(--cyan); }
+.cell.orange{ color:var(--orange); text-shadow:0 0 8px var(--orange); }
+
+.small.wonCyan{ background:rgba(0,229,255,.15); }
+.small.wonOrange{ background:rgba(255,140,0,.18); }
+
+.overlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:90px;
+    font-weight:bold;
+    pointer-events:none;
+    opacity:.9;
+}
+
+.overlay.cyan{ color:var(--cyan); text-shadow:0 0 25px var(--cyan); }
+.overlay.orange{ color:var(--orange); text-shadow:0 0 25px var(--orange); }
+
+.turnCyan{color:var(--cyan);}
+.turnOrange{color:var(--orange);}
+</style>
+</head>
+
+<body>
+
+<h1>Ultimate Tic Tac Toe</h1>
+<div id="status"></div>
+<div id="board" class="big"></div>
+
+<script>
+const boardEl = document.getElementById("board");
+const statusEl = document.getElementById("status");
+
+let turn="C"; // C = cyan, O = orange
+let forcedBoard=null;
+let gameOver=false;
+
+const smallBoards=[];
+const smallWinners=Array(9).fill(null);
+
+function createBoard(){
+    for(let b=0;b<9;b++){
+        const small=document.createElement("div");
+        small.className="small";
+        small.dataset.index=b;
+
+        const cells=[];
+        for(let c=0;c<9;c++){
+            const cell=document.createElement("div");
+            cell.className="cell";
+            cell.dataset.cell=c;
+            cell.addEventListener("click",()=>move(b,c));
+            small.appendChild(cell);
+            cells.push(cell);
+        }
+
+        boardEl.appendChild(small);
+        smallBoards.push({el:small,cells});
+    }
+    updatePlayable();
+    updateStatus();
+}
+
+function move(boardIndex,cellIndex){
+    if(gameOver) return;
+
+    if(forcedBoard!==null && boardIndex!==forcedBoard){
+        if(isBoardFree(forcedBoard)) return;
+    }
+
+    const board=smallBoards[boardIndex];
+    const cell=board.cells[cellIndex];
+
+    if(cell.textContent!=="" || smallWinners[boardIndex]) return;
+
+    if(turn==="C"){
+        cell.textContent="X";
+        cell.classList.add("cyan");
+    }else{
+        cell.textContent="O";
+        cell.classList.add("orange");
+    }
+
+    if(checkWin(board.cells,turn)){
+        smallWinners[boardIndex]=turn;
+        board.el.classList.add(turn==="C"?"wonCyan":"wonOrange");
+
+        const overlay=document.createElement("div");
+        overlay.className="overlay "+(turn==="C"?"cyan":"orange");
+        overlay.textContent=turn==="C"?"X":"O";
+        board.el.appendChild(overlay);
+    }
+
+    if(checkBigWin(turn)){
+        statusEl.innerHTML = `<span class="${turn==="C"?"turnCyan":"turnOrange"}">${turn==="C"?"Cyan":"Orange"} wins</span>`;
+        gameOver=true;
+        updatePlayable();
+        return;
+    }
+
+    forcedBoard=cellIndex;
+    if(!isBoardFree(forcedBoard)) forcedBoard=null;
+
+    turn = turn==="C"?"O":"C";
+    updatePlayable();
+    updateStatus();
+}
+
+function isBoardFree(i){
+    if(i===null) return true;
+    if(smallWinners[i]) return false;
+    return smallBoards[i].cells.some(c=>c.textContent==="");
+}
+
+function updatePlayable(){
+    smallBoards.forEach((b,i)=>{
+        b.el.classList.remove("playable","cyan","orange");
+        if(gameOver) return;
+
+        if(forcedBoard===null){
+            if(!smallWinners[i] && isBoardFree(i)){
+                b.el.classList.add("playable");
+                b.el.classList.add(turn==="C"?"cyan":"orange");
+            }
+        }else{
+            if(i===forcedBoard && !smallWinners[i]){
+                b.el.classList.add("playable");
+                b.el.classList.add(turn==="C"?"cyan":"orange");
+            }
+        }
+    });
+}
+
+function updateStatus(){
+    if(gameOver) return;
+
+    const player = turn==="C"
+        ? `<span class="turnCyan">Cyan</span>`
+        : `<span class="turnOrange">Orange</span>`;
+
+    if(forcedBoard===null){
+        statusEl.innerHTML = `${player} turn — play anywhere`;
+    }else{
+        statusEl.innerHTML = `${player} turn — board ${forcedBoard+1}`;
+    }
+}
+
+function checkWin(cells,player){
+    const symbol = player==="C"?"X":"O";
+    const w=[
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+    ];
+    return w.some(line=>line.every(i=>cells[i].textContent===symbol));
+}
+
+function checkBigWin(player){
+    const w=[
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+    ];
+    return w.some(line=>line.every(i=>smallWinners[i]===player));
+}
+
+createBoard();
+</script>
+
+</body>
+</html>
